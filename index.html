@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="WEDGE">
+<meta name="theme-color" content="#080e08">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="styles.css">
+<title>WEDGE//PLAN</title>
+</head>
+<body>
+<header>
+  <div class="hrow">
+    <div>
+      <div class="brand">WEDGE//PLAN</div>
+      <div class="sub" id="sub">loading…</div>
+    </div>
+    <div class="cd"><b id="cdn">—</b><span>DAYS</span></div>
+  </div>
+  <nav>
+    <button data-t="map" class="on">Map</button>
+    <button data-t="matrix">Matrix</button>
+    <button data-t="putt">Putt</button>
+    <button data-t="data">Data</button>
+  </nav>
+</header>
+<main id="app"></main>
+<script src="config.js" onerror="window.WEDGE_CONFIG={SYNC_ENABLED:false}"></script>
+<script type="module" src="app.js"></script>
+<script>
+if ("serviceWorker" in navigator) {
+  addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
+}
+</script>
+</body>
+</html>
