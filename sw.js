@@ -1,5 +1,5 @@
 // Bump CACHE on every deploy or phones will serve the old app forever.
-const CACHE = "wedge-v1";
+const CACHE = "wedge-v2";
 const ASSETS = ["./", "./index.html", "./manifest.json", "./app.js", "./styles.css"];
 
 self.addEventListener("install", e => {
