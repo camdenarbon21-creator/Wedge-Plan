@@ -1,0 +1,5 @@
+window.WEDGE_CONFIG = {
+  SUPABASE_URL: "https://kzcwhdwwpkxbwumrtpzw.supabase.co",
+  SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt6Y3doZHd3cGt4Ynd1bXJ0cHp3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU4NzU2OTUsImV4cCI6MjEwMTQ1MTY5NX0.l6DZkoxf5cZ5mc86LCIh6FxOi9Je5xfJX0LxKSvxLA4",
+  SYNC_ENABLED: true,
+};
