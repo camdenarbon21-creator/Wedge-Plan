@@ -70,16 +70,21 @@ async function save(table, row) {
 }
 
 /* ── State ─────────────────────────────────────────────────────────── */
-let tab = "map", club = "60", feel = "knee", pd = 25, cur = Array(10).fill(null);
+let tab = "map", club = "60", feel = "knee", choke = 0, pd = 25, cur = Array(10).fill(null);
+const CHOKES = [0, 1, 2];
+// Retired stocks: kept in the data, hidden from the matrix and ladder.
+// 55 knee (69yds) sat 2yds off 60 hip (71) — redundant slot, no reason to carry both.
+const RETIRED = new Set(["55|knee|0"]);
+const key = (c, f, k) => `${c}|${f}|${k}`;
 let shots = [], lag = [], queued = 0;
 
-const forStock = (c, f) => shots
-  .filter(s => s.club === c && s.feel === f)
+const forStock = (c, f, k = 0) => shots
+  .filter(s => s.club === c && s.feel === f && (s.grip_choke_in || 0) === k)
   .sort((a, b) => (a.hit_on < b.hit_on ? -1 : a.hit_on > b.hit_on ? 1 : a.id - b.id))
   .slice(-CAP);
 
-const stat = (c, f) => {
-  const s = forStock(c, f).map(x => x.carry);
+const stat = (c, f, k = 0) => {
+  const s = forStock(c, f, k).map(x => x.carry);
   if (!s.length) return null;
   const avg = s.reduce((a, b) => a + b, 0) / s.length;
   const sd = s.length > 1
@@ -90,7 +95,8 @@ const stat = (c, f) => {
 
 /* ── Views ─────────────────────────────────────────────────────────── */
 function vMap() {
-  const st = stat(club, feel), list = forStock(club, feel);
+  const st = stat(club, feel, choke), list = forStock(club, feel, choke);
+  const retired = RETIRED.has(key(club, feel, choke));
   return `
   <div class="lbl">LOG A SHOT</div>
   <div class="card">
@@ -100,6 +106,10 @@ function vMap() {
     <div class="lbl">FEEL</div>
     <div class="seg feel" id="feelseg">${FEELS.map(f =>
       `<button data-f="${f.k}" class="${feel===f.k?"on":""}">${f.label}</button>`).join("")}</div>
+    <div class="lbl">GRIP</div>
+    <div class="seg" id="chokeseg">${CHOKES.map(k =>
+      `<button data-k="${k}" class="${choke===k?"on":""}">${k===0?"Full":`Down ${k}"`}</button>`).join("")}</div>
+    ${retired ? `<div class="hint" style="color:#c98a2b">Retired stock — logging still works, but it's hidden from the matrix.</div>` : ""}
     <div class="lbl">CARRY FROM LAUNCH PRO</div>
     <div class="inrow">
       <input type="number" inputmode="decimal" id="carry" placeholder="yds">
@@ -120,17 +130,18 @@ function vMap() {
 
 function vMatrix() {
   const rows = FEELS.map(f => `<tr><td class="f">${f.label}</td>${CLUBS.map(c => {
-    const st = stat(c, f.k);
+    const st = RETIRED.has(key(c, f.k, 0)) ? null : stat(c, f.k, 0);
     return `<td>${st
       ? `<span class="n ${+st.pct>4.5?"wide":""}">${st.avg}<small>${st.n} · ${st.pct}%</small></span>`
       : `<span class="empty">—</span>`}</td>`;
   }).join("")}</tr>`).join("");
 
   const arr = [];
-  CLUBS.forEach(c => FEELS.forEach(f => {
-    const st = stat(c, f.k);
-    if (st) arr.push({ y: st.avg, l: `${c}° ${f.label}` });
-  }));
+  CLUBS.forEach(c => FEELS.forEach(f => CHOKES.forEach(k => {
+    if (RETIRED.has(key(c, f.k, k))) return;
+    const st = stat(c, f.k, k);
+    if (st) arr.push({ y: st.avg, l: `${c}° ${f.label}${k ? ` · down ${k}"` : ""}` });
+  })));
   arr.sort((a, b) => a.y - b.y);
   const gaps = arr.slice(1).map((x, i) => ({ a: arr[i].y, b: x.y, g: x.y - arr[i].y })).filter(x => x.g > 9);
 
@@ -195,7 +206,7 @@ function vData() {
 function render() {
   document.getElementById("cdn").textContent =
     Math.max(0, Math.ceil((TARGET - new Date()) / 864e5));
-  const filled = CLUBS.reduce((a,c)=>a+FEELS.reduce((b,f)=>b+(stat(c,f.k)?1:0),0),0);
+  const filled = CLUBS.reduce((a,c)=>a+FEELS.reduce((b,f)=>b+(!RETIRED.has(key(c,f.k,0))&&stat(c,f.k,0)?1:0),0),0);
   document.getElementById("sub").textContent =
     `Matrix ${filled}/12 · ${queued ? queued + " queued" : CFG.SYNC_ENABLED ? "synced" : "local"}`;
   document.getElementById("app").innerHTML =
@@ -211,13 +222,14 @@ function wire() {
   });
   document.querySelectorAll("#clubseg button").forEach(b => b.onclick = () => { club = b.dataset.c; render(); });
   document.querySelectorAll("#feelseg button").forEach(b => b.onclick = () => { feel = b.dataset.f; render(); });
+  document.querySelectorAll("#chokeseg button").forEach(b => b.onclick = () => { choke = +b.dataset.k; render(); });
 
   const inp = document.getElementById("carry"), add = document.getElementById("addbtn");
   if (add) {
     const go = async () => {
       const v = parseFloat(inp.value);
       if (isNaN(v) || v <= 0) return;
-      await save("shots", { club, feel, carry: Math.round(v), hit_on: today() });
+      await save("shots", { club, feel, carry: Math.round(v), grip_choke_in: choke, hit_on: today() });
       await load(); document.getElementById("carry")?.focus();
     };
     add.onclick = go;
@@ -260,7 +272,8 @@ function wire() {
     try {
       const p = JSON.parse(raw);
       for (const s of (p.shots || [])) await save("shots", {
-        club: String(s.club).replace("°",""), feel: s.feel, carry: s.carry, hit_on: s.hit_on || today() });
+        club: String(s.club).replace("°",""), feel: s.feel, carry: s.carry,
+        grip_choke_in: s.grip_choke_in || 0, hit_on: s.hit_on || today() });
       for (const l of (p.lag_sessions || [])) await save("lag", {
         distance_ft: l.distance_ft, in_zone: l.in_zone, of_putts: 10, logged_on: today() });
       await load();
